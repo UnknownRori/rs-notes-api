@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use axum::{
-    routing::{get, IntoMakeService},
-    Extension, Router,
-};
+use axum::{routing::IntoMakeService, Router};
 use color_eyre::Report;
-use tokio::signal::ctrl_c;
+use tokio::{signal::ctrl_c, sync::RwLock};
 
-use crate::controllers::hello_world::hello_world;
+use crate::{router::router, SharedState};
 
 #[derive(Clone)]
 struct AppState {}
@@ -18,20 +15,18 @@ impl Default for AppState {
     }
 }
 
+#[allow(dead_code)]
 pub struct App<'a> {
     host: &'a str,
     router: IntoMakeService<Router>,
-    state: Arc<AppState>,
+    state: SharedState<AppState>,
 }
 
 impl<'a> App<'a> {
     pub async fn new(host: &'a str) -> Result<App, Report> {
-        let state = Arc::new(AppState::default());
+        let state = Arc::new(RwLock::new(AppState::default()));
         let state_clone = state.clone();
-        let router = Router::new()
-            .layer(Extension(state_clone))
-            .route("/", get(hello_world))
-            .into_make_service();
+        let router = router(state_clone);
 
         Ok(App {
             host,
